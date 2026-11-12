@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Optimización Vial - Cúcuta</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel top">
+  <h1>🚌 EVATRE</h1>
+  <p>Busetas de Cúcuta · escriba origen y destino (barrio, lugar o dirección).</p>
+  <input type="text" id="o" list="lugares" placeholder="📍 Origen" value="Universidad Simón Bolívar">
+  <input type="text" id="d" list="lugares" placeholder="🏁 Destino" value="Los Patios">
+  <datalist id="lugares"></datalist>
+  <div class="fila">
+    <button id="sim">Buscar ruta</button>
+    <button id="btnG" class="sec" disabled>Grafo</button>
+    <button id="btnL" class="sec">Líneas</button>
+  </div>
+  <label class="chk"><input type="checkbox" id="ajus"> Ajustar paradas (arrastrar las mal ubicadas; se guardan)</label>
+  <button id="copiar" class="sec" style="display:none;font-size:13px;padding:7px">Copiar coordenadas corregidas</button>
+  <div id="estado"></div>
+</div>
+<div class="panel" id="card"></div>
+<div class="panel" id="lineas"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
