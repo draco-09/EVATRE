@@ -3,32 +3,120 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Simulador de Optimización Vial - Cúcuta</title>
+<title>EVATRE · Busetas de Cúcuta, Los Patios y El Zulia</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div id="map"></div>
 
-<div class="panel top">
-  <h1>🚌 EVATRE</h1>
-  <p>Busetas de Cúcuta · escriba origen y destino (barrio, lugar o dirección).</p>
-  <input type="text" id="o" list="lugares" placeholder="📍 Origen" value="Universidad Simón Bolívar">
-  <input type="text" id="d" list="lugares" placeholder="🏁 Destino" value="Los Patios">
-  <datalist id="lugares"></datalist>
-  <div class="fila">
-    <button id="sim">Buscar ruta</button>
-    <button id="btnG" class="sec" disabled>Grafo</button>
-    <button id="btnL" class="sec">Líneas</button>
+<!-- ============ Panel principal ============ -->
+<aside id="panel" class="tarjeta">
+  <header class="marca">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21v-2M16 21v-2M8 15h.01M16 15h.01"/></svg>
+    </div>
+    <div class="marca-txt">
+      <div class="fila-t"><h1>EVATRE</h1><span class="chip-ciudad">CÚCUTA</span></div>
+      <p>Busetas de Cúcuta, Los Patios y El Zulia</p>
+    </div>
+    <div class="marca-btns">
+      <button id="btnCapas" class="icono" title="Cambiar entre satélite y calles">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5M2 17l10 5 10-5"/></svg>
+      </button>
+      <button id="btnEmpresas" class="icono texto" title="Líneas por empresa">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>
+        Empresas
+      </button>
+    </div>
+  </header>
+
+  <div class="campo">
+    <span class="ic verde"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+    <input id="origen" type="text" list="lugares" placeholder="Origen: escriba un lugar o barrio" autocomplete="off">
+    <button id="btnUbic" class="peq" title="Usar mi ubicación">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
+    <button class="peq limpiar" data-limpia="origen" title="Borrar">×</button>
   </div>
-  <label class="chk"><input type="checkbox" id="ajus"> Ajustar paradas (arrastrar las mal ubicadas; se guardan)</label>
-  <button id="copiar" class="sec" style="display:none;font-size:13px;padding:7px">Copiar coordenadas corregidas</button>
-  <div id="estado"></div>
+  <button id="btnSwap" class="swap" title="Intercambiar origen y destino">⇅</button>
+  <div class="campo">
+    <span class="ic rojo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 19-9-9 19-2-8z"/></svg></span>
+    <input id="destino" type="text" list="lugares" placeholder="Destino: ¿a dónde va?" autocomplete="off">
+    <button class="peq limpiar" data-limpia="destino" title="Borrar">×</button>
+  </div>
+  <datalist id="lugares"></datalist>
+
+  <div id="hintUbic" class="hint oculto"></div>
+
+  <div class="acciones">
+    <button id="btnBuscar" class="primario">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <span>Buscar Ruta Directa</span>
+    </button>
+    <button id="btnLimpiar" class="secundario">Limpiar</button>
+    <button id="btnSimularUbic" class="secundario">Simular mi ubicación en Cúcuta</button>
+  </div>
+
+  <div class="frecuentes"><span class="fr-tit">✨ Paradas frecuentes:</span><div id="frecuentes"></div></div>
+  <label class="chk"><input type="checkbox" id="chkAjustar"> Ajustar paradas en el mapa</label>
+  <div id="estado" class="estado"></div>
+</aside>
+
+<!-- ============ Resultado ============ -->
+<section id="resultado" class="tarjeta oculto">
+  <div class="res-cab">
+    <div>
+      <div class="res-ok">✓ <span id="resTitulo"></span></div>
+      <div id="resSub" class="res-sub"></div>
+    </div>
+    <button id="resCerrar" class="cerrar" title="Cerrar">×</button>
+  </div>
+  <div class="res-info"><span id="resInfo"></span><label><input type="checkbox" id="chkTodas" checked> Ver todas</label></div>
+  <div id="resCerca" class="cerca oculto"></div>
+  <div class="acciones res-acciones"><button id="btnGrafo" class="secundario">Ver Grafo</button></div>
+  <div id="resLista" class="res-lista"></div>
+  <div id="resNota" class="res-nota"></div>
+</section>
+
+<!-- ============ Líneas por empresa ============ -->
+<section id="empresas" class="tarjeta oculto">
+  <header class="emp-cab">
+    <div class="emp-tit">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#3b5bdb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>
+      <div><h2>Líneas por Empresa de Transporte</h2><p>Consulte las rutas oficiales sobre carreteras de cada empresa</p></div>
+    </div>
+    <button id="empCerrar" class="cerrar" title="Cerrar">×</button>
+  </header>
+  <div id="empTabs" class="tabs"></div>
+  <div id="empLista" class="emp-lista"></div>
+  <footer class="emp-pie">
+    <button id="empOcultar" class="enlace">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.2 3.2M1 1l22 22"/></svg>
+      Ocultar trazado
+    </button>
+    <span>EVATRE Cúcuta · Los Patios · El Zulia</span>
+  </footer>
+</section>
+
+<!-- ============ Permiso de ubicación ============ -->
+<div id="modalUbic" class="modal oculto">
+  <div class="modal-caja">
+    <div class="modal-ic">
+      <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </div>
+    <h3>¿Deseas permitir el acceso a tu ubicación en tiempo real?</h3>
+    <p>EVATRE necesita tu permiso de ubicación para situarte en el mapa sobre las calles reales de Cúcuta y Los Patios, seguir tu trayecto y encontrar de forma automática la parada de buseta más cercana a donde estés.</p>
+    <div class="modal-btns">
+      <button id="ubCancelar" class="secundario">Cancelar</button>
+      <button id="ubPermitir" class="primario">✓ Sí, Permitir</button>
+    </div>
+  </div>
 </div>
-<div class="panel" id="card"></div>
-<div class="panel" id="lineas"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="datos.js"></script>
+<script src="modelo.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

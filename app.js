@@ -1,629 +1,441 @@
+'use strict';
 /* =====================================================================
-   CONFIGURACIÓN
+   EVATRE · VISTA + CONTROLADOR (MVC)
+   El modelo (datos, grafo, Dijkstra, rutas directas) está en modelo.js.
    ===================================================================== */
-const VEL=20;                       // km/h para el tiempo aproximado
-const ESPERA=8, TRANSBORDO=6;       // solo para elegir la mejor combinación (no se suman al tiempo mostrado)
-const TODAS_PASAN_POR_CENTRO=true;  // según el equipo: todas las rutas pasan por el Parque Santander (poner false para desactivar)
-
-/* =====================================================================
-   DATOS. Las coordenadas de abajo son una estimación inicial: al arrancar,
-   EVATRE las verifica con OpenStreetMap y corrige las que encuentra.
-   Formato: id|Nombre|lat|lng|alias;alias
-   ===================================================================== */
-const NODOS_TXT = `
-centro|Centro (Parque Santander)|7.8939|-72.5078|centro;parque santander;parque colon
-terminal|Terminal de Transportes|7.8845|-72.5015|terminal;terminal de transportes
-cenabastos|Cenabastos|7.8800|-72.4860|cenabastos
-guaimaral|Guaimaral|7.9170|-72.5090|guaimaral
-sevilla|Sevilla|7.8870|-72.5060|sevilla;av sevilla
-americas|Av. Las Américas|7.9000|-72.5140|americas;las americas;av las americas
-camilodaza|Camilo Daza|7.9215|-72.5130|camilo daza
-antoniasantos|Antonia Santos|7.9010|-72.5200|antonia santos
-escobal|Escobal|7.9140|-72.5250|escobal
-barriobogota|Barrio Bogotá|7.8830|-72.5170|barrio bogota;bogota
-santacecilia|Santa Cecilia|7.8890|-72.5230|santa cecilia
-bellavista|Bellavista|7.8860|-72.5120|bellavista
-nidia|Nidia|7.9060|-72.5400|nidia
-desierto|El Desierto|7.9000|-72.5290|el desierto;desierto
-atalaya|Ciudad Atalaya|7.9060|-72.5340|atalaya;ciudad atalaya
-santaana|Santa Ana|7.9150|-72.5380|santa ana
-launion|La Unión|7.9100|-72.5300|la union
-pradosnorte|Prados Norte|7.9230|-72.4950|prados norte
-hospital|Hospital Erasmo Meoz|7.9029|-72.4940|hospital;erasmo meoz;erasmo
-cerropico|Cerro Pico|7.9000|-72.5470|cerro pico;cerropico
-elprogreso|El Progreso|7.9010|-72.5500|el progreso
-trigal|Trigal del Norte|7.9240|-72.4990|trigal;trigal del norte;trigal norte
-belen|Belén|7.9150|-72.4800|belen
-salado|El Salado|7.9060|-72.4840|salado;el salado;carcel modelo
-portico|El Pórtico|7.9110|-72.4950|portico;el portico
-cocacola|Coca Cola|7.9000|-72.5000|coca cola
-montebello|Montebello|7.8450|-72.5200|montebello
-villasilvania|Villa Silvania|7.8650|-72.5120|villa silvania;silvania
-tierralinda|Tierra Linda (Los Patios)|7.8161|-72.5139|tierra linda;tierralinda
-llanitos|Llanitos (Los Patios)|7.8210|-72.5030|llanitos;los llanitos
-lospatios|Los Patios|7.8342|-72.5059|los patios;patios
-laparada|La Parada|7.8300|-72.4480|la parada;parada
-villadelrosario|Villa del Rosario|7.8335|-72.4730|villa del rosario;rosario
-acacios|Los Acacios|7.8400|-72.4600|acacios;los acacios;acasios
-palmita|La Palmita|7.8600|-72.4780|palmita;la palmita
-garciaherreros|García Herreros|7.8560|-72.5070|garcia herreros
-cuberos|Cuberos|7.8920|-72.5290|cuberos
-losalpes|Los Alpes|7.8990|-72.5230|los alpes
-vallesrodeo|Valles del Rodeo|7.9080|-72.4700|valles del rodeo;rincon del rodeo
-zulima|Zulima|7.9000|-72.4790|zulima
-siglo21|Siglo XXI|7.9180|-72.5200|siglo xxi;siglo 21
-nogal|El Nogal|7.8700|-72.5200|nogal;el nogal
-motilones|Motilones|7.8800|-72.5250|motilones
-lasabana|La Sabana|7.8500|-72.5010|la sabana;sabana
-sanmartin|San Martín|7.9120|-72.4870|san martin
-colsag|Colsag|7.9025|-72.4870|colsag
-molinos|Molinos|7.9270|-72.5080|molinos;aeropuerto;camilo daza aeropuerto
-colinas|Colinas|7.9230|-72.5170|colinas
-nuevohorizonte|Nuevo Horizonte|7.9120|-72.5420|nuevo horizonte
-aguascalientes|Aguas Calientes|7.9280|-72.5300|aguas calientes
-betania|Betania|7.8420|-72.5260|betania
-chaparral|Chaparral|7.9290|-72.5180|chaparral
-sena|SENA|7.9100|-72.4930|sena
-udes|UDES (Universidad de Santander)|7.9085|-72.5090|udes;universidad de santander
-usb|Universidad Simón Bolívar|7.8955|-72.5105|universidad simon bolivar;usb;unisimon;simon bolivar universidad
-escalabrini|Escalabrini|7.9070|-72.5230|escalabrini
-gaitan|Gaitán|7.9070|-72.5110|gaitan
-sanluis|San Luis|7.9100|-72.5030|san luis
-juanarangel|Juana Rangel|7.8800|-72.5290|juana rangel
-mariapaz|María Paz|7.8950|-72.5350|maria paz
-sancayetano|San Cayetano|7.8700|-72.6100|san cayetano
-elzulia|El Zulia|7.9380|-72.5990|el zulia;zulia
-pinar|Pinar del Río|7.8690|-72.4990|pinar del rio;pinar
-sanrafael|San Rafael|7.8780|-72.5030|san rafael
-cormoranes|Torres de Cormoranes|7.9170|-72.4720|cormoranes;cormonares;torres de cormoranes
-pradoseste|Prados del Este|7.8960|-72.4720|prados del este
-simonbolivar|Simón Bolívar (barrio)|7.9000|-72.5380|simon bolivar;barrio simon bolivar
-porvenir|Porvenir|7.9170|-72.5330|porvenir
-`.trim().split("\n").map(l=>{const p=l.split("|");return {id:p[0],n:p[1],ll:[+p[2],+p[3]],al:p[4].split(";"),ver:null};});
-const IX={};NODOS_TXT.forEach((n,i)=>IX[n.id]=i);
-
-/* Texto con el que se busca cada parada en OpenStreetMap (por defecto: "Nombre, Cúcuta") */
-const QUERY={
-  tierralinda:"barrio Tierra Linda, Los Patios", llanitos:"barrio Llanitos, Los Patios", lospatios:"Los Patios, Norte de Santander",
-  laparada:"La Parada, Villa del Rosario", villadelrosario:"Villa del Rosario, Norte de Santander", acacios:"Los Acacios, Villa del Rosario",
-  montebello:"Montebello, Los Patios", lasabana:"La Sabana, Los Patios", elzulia:"El Zulia, Norte de Santander",
-  sancayetano:"San Cayetano, Norte de Santander", centro:"Parque Santander, Cúcuta", terminal:"Terminal de Transporte, Cúcuta",
-  hospital:"Hospital Universitario Erasmo Meoz, Cúcuta", udes:"Universidad de Santander, Cúcuta",
-  usb:"Universidad Simón Bolívar, Cúcuta", sena:"SENA, Cúcuta", americas:"Avenida Las Américas, Cúcuta",
-  molinos:"barrio Molinos, Cúcuta", sevilla:"barrio Sevilla, Cúcuta", pinar:"Pinar del Río, Cúcuta"
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtM = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km';
+const sv = (d, w) => `<svg viewBox="0 0 24 24" width="${w || 15}" height="${w || 15}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  reloj: sv('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 14),
+  regla: sv('<path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/>', 14),
+  gente: sv('<circle cx="9" cy="8" r="3"/><path d="M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1M17 11a3 3 0 1 0 0-6M21 20v-1a4 4 0 0 0-3-4"/>', 14),
+  mano: sv('<path d="M9 11V5a2 2 0 0 1 4 0v5M13 10V8a2 2 0 0 1 4 0v4M17 11a2 2 0 0 1 4 0v4a7 7 0 0 1-7 7h-1a7 7 0 0 1-5-2l-4-5a2 2 0 0 1 3-2l2 2"/>', 15),
+  camina: sv('<circle cx="13" cy="4" r="2"/><path d="m9 22 2-7-3-3 2-5 3 2 3 1M8 12l-2 3M14 15l2 7"/>', 14),
+  ruta: sv('<circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h7a4 4 0 0 0 0-8H8a4 4 0 0 1 0-8h7"/>', 15)
 };
 
-/* Empresas y rutas: [código, nombre, paradas (ids), vías (opcional, separadas por |)]
-   Las "vías" solo están donde hay un documento que las describe. */
-const EMP=[
- {n:"Trasan S.A.",c:"#e53935",p:"TS",r:[
-  ["1","Tierra Linda – Terminal – Centro","tierralinda lospatios pinar sanrafael terminal centro usb",
-     "Av. 10|Pinar del Río|San Rafael|Av. 1|Diagonal Santander|Redoma El Terminal|Av. 8|Calle 9|Calle 13|Av. 6|Calle 15|Av. 2"],
-  ["2","Tierra Linda – El Progreso","tierralinda lospatios pinar sanrafael terminal centro usb atalaya cerropico elprogreso",
-     "Av. 10|Pinar del Río|San Rafael|Av. 1|Diagonal Santander|Redoma El Terminal|Av. 8|Autopista Atalaya|Cerro Pico|Calle 13|Av. 6|Calle 15|Av. 2"],
-  ["(código por confirmar)","Tierra Linda – Cenabastos","tierralinda lospatios pinar sanrafael terminal cenabastos"],
-  ["U12","Antonia Santos – Centro","antoniasantos americas centro"],
-  ["U13","Antonia Santos – Escobal","antoniasantos escobal"],
-  ["U11","Barrio Bogotá – Cenabastos","barriobogota terminal cenabastos"],
-  ["U14","Barrio Bogotá – Centro","barriobogota centro"],
-  ["U10","Barrio Bogotá – Santa Cecilia","barriobogota santacecilia"],
-  ["U16","Camilo Daza – Guaimaral – Centro","camilodaza guaimaral centro"],
-  ["U25","Escobal – San Luis – Gaitán","escobal sanluis gaitan"],
-  ["U24","Escobal – Guaimaral – Gaitán","escobal guaimaral gaitan"],
-  ["U17","Nidia – El Desierto – Centro","nidia desierto centro"],
-  ["U18","Nidia – Centro","nidia centro"],
-  ["U19","Nidia – Américas – Centro","nidia americas centro"],
-  ["U20","Nidia – Santa Ana – La Unión","nidia santaana launion"],
-  ["U1","Prados Norte – Faroles – Centro","pradosnorte portico centro"],
-  ["U2","Prados Norte – Cerro Pico","pradosnorte centro cerropico"],
-  ["U3","Prados Norte – Libertadores – Centro","pradosnorte hospital centro"],
-  ["U22","Trigal Norte – Guaimaral – Centro","trigal guaimaral centro"],
-  ["U21","Trigal Norte – Terminal – Centro","trigal terminal centro"],
-  ["U9","Belén – Guaimaral – Cenabastos","belen guaimaral cenabastos"],
-  ["U5","Salado – Centro","salado centro"],
-  ["U6","Salado – El Pórtico","salado portico"],
-  ["U7","Salado – Coca Cola","salado cocacola"],
-  ["M3","Montebello – Villa Silvania","montebello villasilvania"],
-  ["M4","Montebello – Cenabastos","montebello villasilvania cenabastos"],
-  ["M5","Montebello – Américas","montebello nogal americas"]
- ]},
- {n:"Transguasimales",c:"#43a047",p:"GS",r:[
-  ["(código por confirmar)","Tierra Linda – Cenabastos","tierralinda lospatios pinar sanrafael terminal cenabastos"],
-  ["U18","Valles del Rodeo – Hospital – Zulima – Cenabastos","vallesrodeo hospital zulima cenabastos"],
-  ["U14","Cuberos – Prados del Este","cuberos centro pradoseste"],
-  ["U1","García Herreros – Los Alpes","garciaherreros villasilvania terminal losalpes"],
-  ["M6","Montebello – El Nogal – Siglo XXI","montebello nogal siglo21"],
-  ["M3","Montebello – El Nogal – Nidia","montebello nogal nidia"],
-  ["M11V2","Montebello – Sevilla – Cenabastos – Guaimaral","montebello sevilla cenabastos guaimaral"],
-  ["M4","Montebello – El Nogal – Motilones","montebello nogal motilones"],
-  ["M5","Tierra Linda – García Herreros","tierralinda garciaherreros"],
-  ["M9","La Sabana – Terminal","lasabana terminal"],
-  ["M10","La Sabana – Guaimaral – Cenabastos","lasabana guaimaral cenabastos"]
- ]},
- {n:"Trans Tonchalá",c:"#6d4c41",p:"TC",r:[
-  ["U4V1","Belén – San Martín","belen sanmartin"],
-  ["U5","Belén – Guaimaral – Sevilla","belen guaimaral sevilla"],
-  ["U4","Belén – Centro – Guaimaral – Cenabastos","belen centro guaimaral cenabastos"],
-  ["U1","San Martín – Éxito – Camilo Daza","sanmartin camilodaza"],
-  ["U3","San Martín – Colsag – Camilo Daza","sanmartin colsag camilodaza"],
-  ["U10","Molinos – Bellavista","molinos bellavista"],
-  ["U11","Molinos – Zulima – Centro","molinos zulima centro"],
-  ["U9","Molinos – Sevilla – Centro","molinos sevilla centro"],
-  ["U7","Colinas – Guaimaral – Camilo Daza","colinas guaimaral camilodaza"],
-  ["U12","Nuevo Horizonte – Centro","nuevohorizonte centro"],
-  ["U13","Nuevo Horizonte – Siglo XXI – Guaimaral – Centro","nuevohorizonte siglo21 guaimaral centro"],
-  ["M1","Montebello – Molinos","montebello terminal molinos"],
-  ["M2","Montebello – Nuevo Horizonte","montebello nogal nuevohorizonte"],
-  ["M3","Montebello – Cenabastos","montebello cenabastos"],
-  ["M4","Montebello – Escobal","montebello nogal escobal"],
-  ["M5","Montebello – Zulima – Cenabastos","montebello zulima cenabastos"],
-  ["M6","Montebello – SENA – Cenabastos","montebello sena cenabastos"],
-  ["M8","Bellavista – Cerro Pico – El Zulia","bellavista cerropico elzulia"],
-  ["M7","Bellavista – Vía Ureña – El Zulia","bellavista elzulia"]
- ]},
- {n:"Trans Oriental",c:"#00897b",p:"TO",r:[
-  ["U2V1","Aguas Calientes – Cenabastos","aguascalientes americas cenabastos"],
-  ["U2","Aguas Calientes – Américas","aguascalientes americas"],
-  ["U12","Villa Silvania – Valles del Rodeo","villasilvania cenabastos vallesrodeo"],
-  ["U11","Villa Silvania – Colsag – Valles del Rodeo","villasilvania colsag vallesrodeo"],
-  ["U1","Valles del Rodeo – Escobal","vallesrodeo escobal"],
-  ["U4","Valles del Rodeo – Villa Silvania","vallesrodeo villasilvania"],
-  ["M6","Betania – Cenabastos","betania cenabastos"],
-  ["M8V1","Betania – SENA","betania cenabastos sena"],
-  ["M4V1","Betania – Motilones","betania motilones"],
-  ["M3V1","Chaparral – Guaimaral","chaparral guaimaral"]
- ]},
- {n:"Coomicro Ltda.",c:"#1e88e5",p:"CM",r:[
-  ["U1V2","Camilo Daza – Colsag – Bellavista","camilodaza colsag bellavista"],
-  ["U2","Escalabrini – Gaitán","escalabrini gaitan"],
-  ["U1V1","Escalabrini – Centro","escalabrini centro"],
-  ["U9","Santa Ana – SENA – Nuevo Horizonte","santaana sena nuevohorizonte"],
-  ["U3","Nuevo Horizonte – Belén – SENA","nuevohorizonte belen sena"],
-  ["U8","Juana Rangel – Américas – Cenabastos – Guaimaral – Centro","juanarangel americas cenabastos guaimaral centro"],
-  ["U7","Juana Rangel – Centro","juanarangel centro"],
-  ["M1","Patios – Nuevo Horizonte","lospatios centro nuevohorizonte"]
- ]},
- {n:"Corta Distancia S.A.",c:"#fb8c00",p:"CD",r:[
-  ["M2","Acacios – La Parada","acacios laparada"],
-  ["M7","La Palmita – Centro – Terminal","palmita centro terminal"],
-  ["M6","La Palmita – Sevilla – Cenabastos","palmita sevilla cenabastos"],
-  ["M9","La Palmita – Terminal","palmita terminal"],
-  ["M4","La Parada – Cenabastos","laparada villadelrosario cenabastos"],
-  ["M12","La Parada – Cenabastos – Terminal","laparada cenabastos terminal"],
-  ["M1","La Parada – Terminal","laparada villadelrosario lospatios pinar sanrafael terminal"],
-  ["(ruta 1 reestructurada)","La Parada – Los Estoraques","laparada villadelrosario lospatios pinar sanrafael centro atalaya",
-     "El Búnker|Anillo Vial Oriental|La Floresta|Pinar del Río|San Rafael|Barrio Blanco|Latino|Cúcuta 75|Niña Ceci|Belisario|Parque Colón|Av. 1|Av. 3|Intercambiador de Atalaya"],
-  ["M3","La Parada – Villa Silvania","laparada villasilvania"]
- ]},
- {n:"Trans Petrólea",c:"#8e24aa",p:"TP",r:[
-  ["U6","María Paz – Motilones","mariapaz motilones"],
-  ["U7V1","Siglo XXI – San Martín","siglo21 sanmartin"],
-  ["M1","Cenabastos – San Cayetano","cenabastos sancayetano"],
-  ["2.0","Los Patios – El Zulia","lospatios terminal centro elzulia"],
-  ["3.0","San Martín – Cenabastos","sanmartin cenabastos"],
-  ["4.0","María Paz – Antonia Santos","mariapaz antoniasantos"]
- ]},
- {n:"Transontiveros",c:"#d81b60",p:"OT",r:[
-  ["M4","Tierra Linda – Cenabastos","tierralinda lospatios pinar sanrafael terminal cenabastos"],
-  ["M5","Torres de Cormoranes – Parque Colón","cormoranes motilones americas sevilla terminal usb centro",
-     "Motilones|La Laguna|Curva del Pescado|Av. Las Américas|6 de Mayo|Cecilia Castro|Av. Sevilla|Parque Mercedes Ábrego|Calle 13|Calle 15|Unisimón|Parque Colón"],
-  ["PE","Prados del Este – Centro","pradoseste centro"]
- ]},
- {n:"Cootransfronorte",c:"#546e7a",p:"CF",r:[
-  ["U2","Simón Bolívar – Centro","simonbolivar centro"],
-  ["U3","Simón Bolívar – Guaimaral – Centro","simonbolivar guaimaral centro"],
-  ["U1","Porvenir – Centro","porvenir centro"],
-  ["U4","Porvenir – Guaimaral – Centro","porvenir guaimaral centro"],
-  ["U6","Porvenir – Escobal","porvenir escobal"]
- ]},
- /* Ruta que usted indicó y cuya empresa/código aún no se ha confirmado */
- {n:"Empresa por confirmar",c:"#455a64",p:"",r:[
-  ["(código por confirmar)","Llanitos – UDES (pasa por el SENA)","llanitos tierralinda lospatios pinar sanrafael terminal sena udes"]
- ]}
-];
-const RUTAS=[];
-EMP.forEach((e,ei)=>e.r.forEach(r=>RUTAS.push({ei,
-  cod:(r[0].startsWith("(")||!e.p)?r[0]:e.p+"-"+r[0], nom:r[1],
-  p:r[2].split(" ").map(id=>{if(!(id in IX))throw new Error("Nodo desconocido: "+id);return IX[id];}),
-  vias:r[3]?r[3].split("|"):null, geo:null})));
-
-/* ================= Utilidades ================= */
-const $=id=>document.getElementById(id);
-const norm=s=>s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const dormir=ms=>new Promise(r=>setTimeout(r,ms));
-function hav(a,b){const R=6371,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dg=r(b[1]-a[1]);
-  const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
-
 /* =====================================================================
-   MODELO  (datos + lógica; no sabe nada de pantallas)
+   VISTA
    ===================================================================== */
-class ServicioMapas{                      // Adapter: OSRM (carreteras) y Nominatim/OpenStreetMap (lugares)
-  constructor(){this.mem=new Map();this.cola=Promise.resolve();this.ultimo=0;}
-  limitado(fn){                           // Nominatim permite 1 consulta por segundo
-    const p=this.cola.then(async()=>{const w=this.ultimo+1100-Date.now();if(w>0)await dormir(w);this.ultimo=Date.now();return fn();});
-    this.cola=p.catch(()=>{});return p;
+class Vista {
+  constructor(m) {
+    this.m = m;
+    const sat = L.layerGroup([
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imágenes © Esri' }),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })]);
+    const calles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    this.base = 'sat'; this.satelite = sat; this.calles = calles;
+    this.map = L.map('map', { zoomControl: false, layers: [sat] }).setView([7.885, -72.51], 12);
+    L.control.zoom({ position: 'bottomleft' }).addTo(this.map);
+    this.capaParadas = L.layerGroup().addTo(this.map);
+    this.capaRes = L.layerGroup().addTo(this.map);
+    this.capaCaminata = L.layerGroup().addTo(this.map);
+    this.capaCerca = L.layerGroup().addTo(this.map);
+    this.capaEmp = L.layerGroup().addTo(this.map);
+    this.capaUser = L.layerGroup().addTo(this.map);
+    this.capaExtra = L.layerGroup().addTo(this.map);
+    this.capaGrafo = L.layerGroup(); this.modoGrafo = false;
+    this.marcas = []; this.res = null; this.verTodas = true; this.empActiva = 0; this.empRutas = new Map();
+    this.cb = {};   // callbacks que asigna el controlador
   }
-  async tabla(pts){
-    const c=pts.map(p=>p[1]+','+p[0]).join(';');
-    return (await (await fetch(`https://router.project-osrm.org/table/v1/driving/${c}?annotations=distance`)).json()).distances;
+  estado(txt, info) { const e = $('estado'); e.textContent = txt || ''; e.className = 'estado' + (info ? ' info' : ''); }
+  cambiarBase() {
+    if (this.modoGrafo) this.salirGrafo();
+    if (this.base === 'sat') { this.map.removeLayer(this.satelite); this.calles.addTo(this.map); this.base = 'calles'; }
+    else { this.map.removeLayer(this.calles); this.satelite.addTo(this.map); this.base = 'sat'; }
   }
-  /* Geometría que SIGUE LAS CALLES; nunca devuelve líneas rectas */
-  async ruta(pts){
-    const k='evatre:r:'+pts.map(p=>p[0].toFixed(4)+','+p[1].toFixed(4)).join(';');
-    if(this.mem.has(k))return this.mem.get(k);
-    try{const g=localStorage.getItem(k);if(g){const v=JSON.parse(g);this.mem.set(k,v);return v;}}catch(e){}
-    const c=pts.map(p=>p[1]+','+p[0]).join(';');
-    for(let i=0;i<3;i++){
-      try{
-        const j=await (await fetch(`https://router.project-osrm.org/route/v1/driving/${c}?overview=full&geometries=geojson`)).json();
-        if(j.routes&&j.routes[0]){
-          const g=j.routes[0].geometry.coordinates.map(q=>[+q[1].toFixed(5),+q[0].toFixed(5)]);
-          this.mem.set(k,g);try{localStorage.setItem(k,JSON.stringify(g));}catch(e){}
-          return g;
+
+  verGrafo() {
+    if (!this.res) return;
+    this.modoGrafo = true;
+    [this.satelite, this.calles, this.capaParadas, this.capaRes, this.capaCaminata,
+      this.capaCerca, this.capaEmp, this.capaUser, this.capaExtra].forEach(c => {
+      if (this.map.hasLayer(c)) this.map.removeLayer(c);
+    });
+    this.capaGrafo.clearLayers();
+    const vistos = new Set(), puntos = [];
+    this.res.tramos.forEach(t => {
+      const j = t.sel >= 0 ? t.sel : 0, c = t.cands[j];
+      if (!c) return;
+      const ids = c.nodos;
+      for (let k = 0; k < ids.length; k++) {
+        const nd = this.m.nodos[ids[k]];
+        if (!nd) continue;
+        puntos.push(nd.ll);
+        if (!vistos.has(ids[k])) {
+          vistos.add(ids[k]);
+          L.circleMarker(nd.ll, { radius: 7, color: '#fff', weight: 2, fillColor: '#2563eb', fillOpacity: 1 })
+            .addTo(this.capaGrafo).bindTooltip(nd.n, { permanent: true, direction: 'top', offset: [0, -8] });
         }
-      }catch(e){}
-      await dormir(700);
-    }
-    return null;
-  }
-  /* Busca un lugar en OpenStreetMap y devuelve el resultado más cercano a la estimación (máx. 8 km) */
-  async lugar(q,ref){
-    const k='evatre:g:'+q;let lista=null;
-    try{const g=localStorage.getItem(k);if(g)lista=JSON.parse(g);}catch(e){}
-    if(!lista){
-      try{
-        lista=await this.limitado(async()=>{
-          const url=`https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=co&viewbox=-72.75,8.05,-72.30,7.70&bounded=1&q=${encodeURIComponent(q)}`;
-          const j=await (await fetch(url)).json();
-          return j.map(x=>[parseFloat(x.lat),parseFloat(x.lon)]);
-        });
-        try{localStorage.setItem(k,JSON.stringify(lista));}catch(e){}
-      }catch(e){return null;}
-    }
-    let best=null,bd=8;lista.forEach(p=>{const d=hav(p,ref);if(d<bd){bd=d;best=p;}});
-    return best;
-  }
-  async geocodificar(q){
-    try{
-      return await this.limitado(async()=>{
-        const url=`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=co&viewbox=-72.75,8.05,-72.30,7.70&bounded=1&q=${encodeURIComponent(q+', Cúcuta')}`;
-        const j=await (await fetch(url)).json();
-        return j.length?[parseFloat(j[0].lat),parseFloat(j[0].lon)]:null;
-      });
-    }catch(e){return null;}
-  }
-}
-
-class Grafo{                              // Grafo de estados (parada, ruta) + Dijkstra
-  constructor(nodos,rutas){
-    this.nodos=nodos;this.rutas=rutas;this.n=nodos.length;
-    this.KM=Array.from({length:this.n},(_,i)=>Array.from({length:this.n},(_,j)=>i===j?0:999));
-  }
-  estados(){
-    this.ST=[];this.porNodo=Array.from({length:this.n},()=>[]);
-    this.rutas.forEach((r,ri)=>{r.sid=r.p.map((nodo,i)=>{this.ST.push({ri,i,nodo});this.porNodo[nodo].push(this.ST.length-1);return this.ST.length-1;});});
-  }
-  construir(){
-    this.ADY=this.ST.map(()=>[]);
-    this.rutas.forEach(r=>{for(let k=0;k<r.p.length-1;k++){
-      const a=r.sid[k],b=r.sid[k+1],w=this.KM[r.p[k]][r.p[k+1]]/VEL*60;
-      this.ADY[a].push([b,w]);this.ADY[b].push([a,w]);
-    }});
-    this.porNodo.forEach(l=>l.forEach(a=>l.forEach(b=>{if(a!==b&&this.ST[a].ri!==this.ST[b].ri)this.ADY[a].push([b,TRANSBORDO]);})));
-  }
-  dijkstra(origen,destino){
-    const V=this.ST.length,dist=Array(V).fill(Infinity),prev=Array(V).fill(-1),vis=Array(V).fill(false);
-    this.porNodo[origen].forEach(s=>dist[s]=ESPERA);
-    for(let k=0;k<V;k++){
-      let u=-1;for(let v=0;v<V;v++)if(!vis[v]&&dist[v]<Infinity&&(u===-1||dist[v]<dist[u]))u=v;
-      if(u===-1)break;vis[u]=true;
-      this.ADY[u].forEach(([v,w])=>{if(!vis[v]&&dist[u]+w<dist[v]){dist[v]=dist[u]+w;prev[v]=u;}});
-    }
-    let best=-1;this.porNodo[destino].forEach(s=>{if(dist[s]<Infinity&&(best===-1||dist[s]<dist[best]))best=s;});
-    if(best===-1)return null;
-    const path=[];for(let s=best;s!==-1;s=prev[s])path.unshift(s);return path;
-  }
-  tramos(path){
-    const segs=[];
-    path.forEach(s=>{const st=this.ST[s];
-      if(!segs.length||segs[segs.length-1].ri!==st.ri)segs.push({ri:st.ri,nodos:[st.nodo]});
-      else{const g=segs[segs.length-1];if(g.nodos[g.nodos.length-1]!==st.nodo)g.nodos.push(st.nodo);}
-    });
-    return segs.filter(s=>s.nodos.length>1);
-  }
-}
-
-class Modelo extends EventTarget{         // Fachada + Observer (avisa con eventos)
-  constructor(){
-    super();
-    this.nodos=NODOS_TXT;this.rutas=RUTAS;this.empresas=EMP;
-    this.servicio=new ServicioMapas();this.grafo=new Grafo(this.nodos,this.rutas);
-    this.listo=this.verificarNodos().then(()=>{this.aplicarCentro();this.grafo.estados();return this.cargarDistancias();});
-  }
-  emit(t,d){this.dispatchEvent(new CustomEvent(t,{detail:d}));}
-  rutasDe(ei){return this.rutas.map((r,i)=>r.ei===ei?i:-1).filter(i=>i>=0);}
-
-  /* Verifica cada parada contra OpenStreetMap (una vez; el resultado queda guardado en el navegador) */
-  async verificarNodos(){
-    let manual={};try{manual=JSON.parse(localStorage.getItem('evatre:manual')||'{}');}catch(e){}
-    let hechos=0;const total=this.nodos.length;
-    for(let i=0;i<total;i++){
-      const nd=this.nodos[i];
-      if(manual[nd.id]){nd.ll=manual[nd.id];nd.ver='manual';}
-      else{
-        const res=await this.servicio.lugar(QUERY[nd.id]||(nd.n.replace(/ \(.*\)/,"")+', Cúcuta'),nd.ll);
-        if(res){nd.ll=res;nd.ver='osm';}else nd.ver='aprox';
+        if (k > 0) {
+          const ant = this.m.nodos[ids[k - 1]];
+          L.polyline([ant.ll, nd.ll], { color: '#f59e0b', weight: 4, opacity: .95 }).addTo(this.capaGrafo);
+        }
       }
-      hechos++;this.emit('verificando',{hechos,total,i});
-    }
-    this.emit('verificado',{});
-  }
-  /* Todas las rutas pasan por el Parque Santander: se inserta donde menos desvío cause */
-  aplicarCentro(){
-    if(!TODAS_PASAN_POR_CENTRO)return;
-    const c=IX.centro,C=this.nodos[c].ll;
-    this.rutas.forEach(r=>{
-      if(r.p.includes(c))return;
-      let best=0,bd=1e9;
-      for(let k=0;k<=r.p.length;k++){
-        const A=k>0?this.nodos[r.p[k-1]].ll:null,B=k<r.p.length?this.nodos[r.p[k]].ll:null;
-        const d=(A&&B)?hav(A,C)+hav(C,B)-hav(A,B):hav(A||B,C);
-        if(d<bd){bd=d;best=k;}
-      }
-      r.p=[...r.p.slice(0,best),c,...r.p.slice(best)];
     });
+    this.capaGrafo.addTo(this.map);
+    if (puntos.length) this.map.fitBounds(L.latLngBounds(puntos), { padding: [55, 55] });
+    const b = $('btnGrafo'); if (b) b.textContent = 'Volver al mapa';
   }
-  async cargarDistancias(){
-    let tabla=null;try{tabla=await this.servicio.tabla(this.nodos.map(n=>n.ll));}catch(e){}
-    const g=this.grafo;
-    this.rutas.forEach(r=>{for(let k=0;k<r.p.length-1;k++){const a=r.p[k],b=r.p[k+1];
-      g.KM[a][b]=g.KM[b][a]=(tabla&&tabla[a][b]!=null)?tabla[a][b]/1000:hav(this.nodos[a].ll,this.nodos[b].ll)*1.3;}});
+  salirGrafo() {
+    if (!this.modoGrafo) return;
+    this.modoGrafo = false;
+    if (this.map.hasLayer(this.capaGrafo)) this.map.removeLayer(this.capaGrafo);
+    (this.base === 'sat' ? this.satelite : this.calles).addTo(this.map);
+    [this.capaParadas, this.capaRes, this.capaCaminata, this.capaCerca,
+      this.capaEmp, this.capaUser, this.capaExtra].forEach(c => c.addTo(this.map));
+    const b = $('btnGrafo'); if (b) b.textContent = 'Ver Grafo';
   }
-  moverNodo(i,ll){
-    const nd=this.nodos[i];nd.ll=ll;nd.ver='manual';
-    try{const m=JSON.parse(localStorage.getItem('evatre:manual')||'{}');m[nd.id]=ll;localStorage.setItem('evatre:manual',JSON.stringify(m));}catch(e){}
-    this.rutas.forEach(r=>{if(r.p.includes(i))r.geo=null;});
-    this.listo=this.listo.then(()=>this.cargarDistancias());this.emit('nodoMovido',{i});
-  }
-  async resolver(txt){
-    const t=norm(txt);if(!t)throw new Error('Escriba el origen y el destino.');
-    let mejor=-1,len=0;
-    this.nodos.forEach((nd,i)=>{
-      [norm(nd.n.replace(/ \(.*\)/,"")),norm(nd.n),...nd.al.map(norm)].forEach(k=>{
-        if(t===k){if(len<1000){mejor=i;len=1000+k.length;}}
-        else if(len<1000&&k.length>=4&&(t.includes(k)||(t.length>=4&&k.includes(t)))&&k.length>len){mejor=i;len=k.length;}
-      });
-    });
-    if(mejor>=0)return {nodo:mejor,extra:null};
-    const ll=await this.servicio.geocodificar(txt);
-    if(!ll)throw new Error('No encontré “'+txt+'”. Pruebe con un barrio o lugar de la lista.');
-    let b=0,bd=1e9;this.nodos.forEach((nd,i)=>{if(!this.grafo.porNodo[i].length)return;const d=hav(ll,nd.ll);if(d<bd){bd=d;b=i;}});
-    return {nodo:b,extra:{txt,ll,hacia:this.nodos[b].ll,km:bd}};
-  }
-  /* Todas las busetas que cubren el tramo a→b (cada ruta con su propio recorrido entre esas dos paradas) */
-  candidatos(a,b){
-    const out=[];
-    this.rutas.forEach((r,ri)=>{
-      const ia=r.p.indexOf(a),ib=r.p.indexOf(b);if(ia<0||ib<0||ia===ib)return;
-      const seq=ia<ib?r.p.slice(ia,ib+1):r.p.slice(ib,ia+1).reverse();
-      let km=0;for(let k=0;k<seq.length-1;k++)km+=this.grafo.KM[seq[k]][seq[k+1]];
-      out.push({ri,nodos:seq,km,min:km/VEL*60});
-    });
-    return out.sort((x,y)=>x.km-y.km);
-  }
-  async buscar(tO,tD){
-    await this.listo;this.grafo.construir();
-    const O=await this.resolver(tO),D=await this.resolver(tD);
-    if(O.nodo===D.nodo)throw new Error('El origen y el destino quedan en la misma parada.');
-    const path=this.grafo.dijkstra(O.nodo,D.nodo);
-    if(!path)throw new Error('No hay ruta de busetas entre esos puntos con las rutas cargadas.');
-    const legs=this.grafo.tramos(path).map(t=>{const a=t.nodos[0],b=t.nodos[t.nodos.length-1];return {a,b,cands:this.candidatos(a,b),sel:0,geo:null};});
-    for(let i=0;i<legs.length;i++){
-      this.emit('progreso',{txt:`Ajustando el recorrido a la carretera (${i+1}/${legs.length})…`});
-      legs[i].geo=await this.servicio.ruta(legs[i].cands[0].nodos.map(x=>this.nodos[x].ll));
-    }
-    const res={o:O.nodo,d:D.nodo,legs,extras:[O.extra,D.extra].filter(Boolean)};
-    this.emit('resultado',res);return res;
-  }
-  async geometriaRuta(ri){
-    const r=this.rutas[ri];
-    if(!r.geo)r.geo=await this.servicio.ruta(r.p.map(x=>this.nodos[x].ll));
-    return r.geo;
-  }
-}
 
-/* =====================================================================
-   VISTA  (todo lo que se dibuja)
-   ===================================================================== */
-class Vista{
-  constructor(modelo){
-    this.m=modelo;
-    const sat=L.layerGroup([
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imágenes © Esri'}),
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}),
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19})]);
-    const calles=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
-    this.map=L.map('map',{layers:[sat]}).setView([7.885,-72.51],12);
-    L.control.layers({"🛰️ Satélite + carreteras":sat,"🗺️ Mapa de calles":calles},null,{position:'bottomright'}).addTo(this.map);
-    this.capaParadas=L.layerGroup().addTo(this.map);this.capaLineas=L.layerGroup().addTo(this.map);
-    this.capaRuta=L.layerGroup().addTo(this.map);this.capaGrafo=L.layerGroup();
-    this.marcadores=[];this.dibujadas=new Map();this.extra=[];this.legLayers=[];this.ultimo=null;this.modoG=false;
-    this.pintarLista();
-  }
-  pin(c){return L.divIcon({className:'',html:'<div class="pin '+(c||'')+'"></div>',iconSize:[14,14],iconAnchor:[7,7]});}
-  estado(txt,info){const e=$('estado');e.textContent=txt||'';e.className=info?'info':'';}
-
-  pintarParadas(alArrastrar){
-    this.m.nodos.forEach((nd,i)=>{
-      const mk=L.marker(nd.ll,{icon:this.pin('unv'),draggable:true}).addTo(this.capaParadas).bindTooltip(nd.n,{direction:'top',offset:[0,-8]});
+  // ------------------------------------------------------------------ paradas
+  iconoParada(nd) { return L.divIcon({ className: '', html: `<div class="dot ${nd.ver === 'aprox' ? 'unv' : nd.ver === 'manual' ? 'man' : ''}"></div>`, iconSize: [13, 13], iconAnchor: [6, 6] }); }
+  pintarParadas() {
+    this.m.nodos.forEach((nd, i) => {
+      const mk = L.marker(nd.ll, { icon: this.iconoParada(nd), draggable: true }).addTo(this.capaParadas);
+      mk.bindTooltip(nd.n, { direction: 'top', offset: [0, -6] });
+      mk.bindPopup(() => this.popupParada(i));
       mk.dragging.disable();
-      mk.on('dragend',()=>{const p=mk.getLatLng();alArrastrar(i,[p.lat,p.lng]);});
-      this.marcadores.push(mk);
-      $('lugares').appendChild(new Option(nd.n,nd.n));
+      mk.on('dragend', () => { const p = mk.getLatLng(); this.cb.mover(i, [p.lat, p.lng]); });
+      this.marcas.push(mk);
     });
+    $('lugares').innerHTML = this.m.nodos.map(n => `<option value="${esc(n.n)}">`).join('');
   }
-  actualizarNodo(i){
-    const nd=this.m.nodos[i],mk=this.marcadores[i];
-    mk.setLatLng(nd.ll);mk.setIcon(this.pin(nd.ver==='aprox'?'unv':''));
-    mk.setTooltipContent(nd.n+(nd.ver==='aprox'?' (ubicación aproximada, sin verificar)':nd.ver==='manual'?' (ajustada por usted)':''));
+  actualizarParadas() { this.m.nodos.forEach((nd, i) => { this.marcas[i].setLatLng(nd.ll); this.marcas[i].setIcon(this.iconoParada(nd)); }); }
+  popupParada(i) {
+    const p = this.m.nodos[i], est = { osm: 'verificada con OpenStreetMap', manual: 'ajustada por usted', aprox: 'aproximada (sin verificar)' }[p.ver] || 'aproximada';
+    return `<div class="pp"><b>${esc(p.n)}</b><div class="pp-s">${p.ll[0].toFixed(5)}, ${p.ll[1].toFixed(5)}<br>${est}</div>
+      <a href="https://www.google.com/maps?q=${p.ll[0]},${p.ll[1]}" target="_blank" rel="noopener">Ver en Google Maps</a>
+      <button onclick="corregirParada(${i})">Corregir con coordenadas de Google Maps</button></div>`;
   }
-  permitirArrastre(on){this.marcadores.forEach(mk=>on?mk.dragging.enable():mk.dragging.disable());$('copiar').style.display=on?'block':'none';}
+  permitirArrastre(on) { this.marcas.forEach(mk => on ? mk.dragging.enable() : mk.dragging.disable()); }
 
-  pintarLista(){
-    $('lineas').innerHTML='<b>Líneas por empresa</b><button class="mini" data-ocultar="1">Ocultar todas</button>'+
-      this.m.empresas.map((e,ei)=>`<div class="emp"><label><input type="checkbox" data-e="${ei}"><i style="background:${e.c}"></i>${esc(e.n)} <small>(${e.r.length})</small></label>
-      <div class="chips">${this.m.rutasDe(ei).map(ri=>`<button class="chip" data-r="${ri}" style="border-color:${e.c}" title="${esc(this.m.rutas[ri].nom)}">${esc(this.m.rutas[ri].cod)}</button>`).join('')}</div></div>`).join('');
+  // ------------------------------------------------------------------ resultado
+  limpiar() {
+    this.salirGrafo();
+    this.res = null;
+    [this.capaRes, this.capaCaminata, this.capaCerca, this.capaExtra].forEach(c => c.clearLayers());
+    $('resultado').classList.add('oculto');
   }
-  dibujarRuta(ri,geo,ajustar){
-    this.quitarRuta(ri);
-    const r=this.m.rutas[ri],col=this.m.empresas[r.ei].c,g=L.layerGroup();
-    L.polyline(geo,{color:'#fff',weight:8,opacity:.9}).addTo(g);
-    L.polyline(geo,{color:col,weight:5}).addTo(g).bindTooltip(`${esc(this.m.empresas[r.ei].n)} · ${esc(r.cod)}<br>${esc(r.nom)}`,{sticky:true});
-    g.addTo(this.capaLineas);this.dibujadas.set(ri,g);
-    const chip=document.querySelector(`.chip[data-r="${ri}"]`);if(chip){chip.classList.add('on');chip.style.background=col;}
-    if(ajustar)this.map.fitBounds(L.latLngBounds(geo),{padding:[80,80]});
+  etiqueta(cls, txt, ll) {
+    return L.marker(ll, { interactive: false, zIndexOffset: 900, icon: L.divIcon({ className: '', html: `<div class="et ${cls}"><span>${esc(txt)}</span><i></i></div>`, iconSize: [0, 0] }) });
   }
-  quitarRuta(ri){
-    const g=this.dibujadas.get(ri);if(g){this.capaLineas.removeLayer(g);this.dibujadas.delete(ri);}
-    const chip=document.querySelector(`.chip[data-r="${ri}"]`);if(chip){chip.classList.remove('on');chip.style.background='#fff';}
-  }
-  ocultarTodas(){[...this.dibujadas.keys()].forEach(ri=>this.quitarRuta(ri));document.querySelectorAll('#lineas input[type=checkbox]').forEach(c=>c.checked=false);}
-
-  limpiarResultado(){
-    if(this.modoG)this.vistaMapa();
-    this.capaRuta.clearLayers();this.legLayers=[];this.extra.forEach(x=>this.map.removeLayer(x));this.extra=[];
-    $('card').style.display='none';$('btnG').disabled=true;this.ultimo=null;
-  }
-  dibujarTramo(i,l){
-    if(this.legLayers[i]){this.capaRuta.removeLayer(this.legLayers[i]);this.legLayers[i]=null;}
-    if(!l.geo)return;
-    const col=this.m.empresas[this.m.rutas[l.cands[l.sel].ri].ei].c,g=L.layerGroup();
-    L.polyline(l.geo,{color:'#fff',weight:14,opacity:.95}).addTo(g);L.polyline(l.geo,{color:col,weight:8}).addTo(g);
-    g.addTo(this.capaRuta);this.legLayers[i]=g;
-  }
-  mostrarResultado(res){
-    const m=this.m,todos=[];this.legLayers=[];
-    res.legs.forEach((l,i)=>{this.dibujarTramo(i,l);if(l.geo)todos.push(...l.geo);});
-    res.extras.forEach(x=>{
-      this.extra.push(L.marker(x.ll,{icon:this.pin('user')}).addTo(this.map).bindTooltip(x.txt,{permanent:true,direction:'top',offset:[0,-8]}));
-      this.extra.push(L.polyline([x.ll,x.hacia],{color:'#00e676',weight:3,dashArray:'6 6'}).addTo(this.map));
-    });
-    L.marker(m.nodos[res.o].ll,{icon:this.pin('user')}).addTo(this.capaRuta).bindTooltip('Salida: '+m.nodos[res.o].n,{permanent:true,direction:'top',offset:[0,-8]});
-    L.marker(m.nodos[res.d].ll,{icon:this.pin('go')}).addTo(this.capaRuta).bindTooltip('Llegada: '+m.nodos[res.d].n,{permanent:true,direction:'top',offset:[0,-8]});
-    const bounds=L.latLngBounds(todos.length?todos:[m.nodos[res.o].ll,m.nodos[res.d].ll]);
-    this.map.fitBounds(bounds,{padding:[90,90]});
-    this.ultimo={res,bounds};$('btnG').disabled=false;this.pintarCard(res);
-    if(res.legs.some(l=>!l.geo))this.estado('No se pudo ajustar parte del recorrido a la carretera (servicio de mapas ocupado). Intente de nuevo.');
-  }
-  pintarCard(res){
-    const m=this.m;let km=0;res.legs.forEach(l=>km+=l.cands[l.sel].km);
-    let h=`<div class="resumen">⏱ ≈ ${Math.round(km/VEL*60)} min · ${km.toFixed(1)} km</div>
-      <div class="nota">Tiempo aproximado, calculado a ${VEL} km/h, sin contar esperas ni transbordos.</div>`;
-    res.extras.forEach(x=>{h+=`<div class="nota">“${esc(x.txt)}”: se usa la parada más cercana (≈${x.km.toFixed(1)} km en línea recta).</div>`;});
-    res.legs.forEach((l,i)=>{
-      h+=`<div class="nota" style="margin-top:10px"><b>${res.legs.length>1?(i+1)+'. ':''}${esc(m.nodos[l.a].n)} → ${esc(m.nodos[l.b].n)}</b> · ${l.cands.length} buseta(s) cubren este tramo (toque una para verla en el mapa):</div>`;
-      l.cands.forEach((c,j)=>{
-        const r=m.rutas[c.ri],e=m.empresas[r.ei];
-        h+=`<div class="cand ${j===l.sel?'sel':''}" data-leg="${i}" data-c="${j}" style="border-left-color:${e.c}"><b>${esc(e.n)}</b> · ${esc(r.cod)}${j===0?'<span class="badge">más rápida</span>':''}<br>${esc(r.nom)}<br><span class="nota">≈ ${Math.round(c.min)} min · ${c.km.toFixed(1)} km${r.vias?'<br>Vías: '+esc(r.vias.join(' · ')):''}</span></div>`;
+  mostrar(res, conservar) {
+    if (conservar && this.res) {   // búsqueda automática: mantener la buseta que el usuario ya había elegido
+      res.tramos.forEach((t, ti) => {
+        const antes = this.res.tramos[ti], previa = antes && antes.sel >= 0 ? antes.cands[antes.sel].ri : null;
+        const k = previa == null ? -1 : t.cands.findIndex(c => c.ri === previa);
+        t.sel = k >= 0 ? k : (t.cands.length === 1 ? 0 : -1);
       });
-      const vias=new Map();
-      l.cands.forEach(c=>{const r=m.rutas[c.ri];(r.vias||[]).forEach(v=>{if(!vias.has(v))vias.set(v,[]);vias.get(v).push(r.cod);});});
-      if(vias.size)h+='<div class="nota" style="margin-top:6px"><b>Por estas vías pasan:</b></div>'+[...vias].map(([v,cs])=>`<div class="via"><b>${esc(v)}</b>: ${cs.map(esc).join(', ')}</div>`).join('');
+    } else res.tramos.forEach(t => { t.sel = t.cands.length === 1 ? 0 : -1; });
+    this.res = res;
+    const b = this.dibujar();
+    if (!conservar) { if (b.length) this.map.fitBounds(L.latLngBounds(b), { padding: [90, 90] }); }
+    this.renderPanel();
+  }
+  /** Dibuja las busetas de cada tramo; si hay varias, se ven todas y el usuario elige. */
+  dibujar() {
+    const r = this.res, m = this.m, pts = [];
+    this.capaRes.clearLayers(); this.capaCaminata.clearLayers(); this.capaExtra.clearLayers();
+    r.tramos.forEach((t, ti) => {
+      const sel = t.sel;
+      let vis = t.cands.map((c, j) => j).filter(j => t.cands[j].geo);
+      if (!this.verTodas) vis = vis.filter(j => sel >= 0 ? j === sel : j === 0);
+      vis.forEach(j => {
+        const fuerte = sel < 0 || j === sel;
+        L.polyline(t.cands[j].geo, { color: '#fff', weight: fuerte ? 12 : 8, opacity: fuerte ? .95 : .45 }).addTo(this.capaRes);
+      });
+      const orden = vis.filter(j => j !== sel); if (sel >= 0 && vis.includes(sel)) orden.push(sel);
+      orden.forEach((j, k) => {
+        const c = t.cands[j], ru = m.rutas[c.ri], em = m.empresas[ru.ei], esSel = j === sel;
+        const lin = L.polyline(c.geo, { color: em.c, weight: esSel ? 7 : (sel >= 0 ? 3 : Math.max(4, 9 - 2 * k)), opacity: (esSel || sel < 0) ? 1 : .4, dashArray: '12 9' }).addTo(this.capaRes);
+        lin.bindTooltip(`${esc(em.n)} · ${esc(ru.cod)}<br>${esc(ru.nom)}`, { sticky: true });
+        lin.on('click', () => this.cb.elegir(ti, j));
+        c.geo.forEach(p => pts.push(p));
+      });
     });
-    $('card').innerHTML=h;$('card').style.display='block';
+    const O = r.origen, D = r.destino, t0 = r.tramos[0], tN = r.tramos[r.tramos.length - 1];
+    const c0 = t0.sel >= 0 ? t0.cands[t0.sel] : t0.cands[0], cN = tN.sel >= 0 ? tN.cands[tN.sel] : tN.cands[0];
+    if (O.nodo < 0 && c0) L.polyline([O.ll, m.nodos[c0.nodos[0]].ll], { color: '#22c55e', weight: 3, dashArray: '5 7' }).addTo(this.capaCaminata);
+    if (D.nodo < 0 && cN) L.polyline([D.ll, m.nodos[cN.nodos[cN.nodos.length - 1]].ll], { color: '#ef4444', weight: 3, dashArray: '5 7' }).addTo(this.capaCaminata);
+    this.etiqueta('o', 'Origen: ' + O.etiqueta, O.ll).addTo(this.capaExtra);
+    this.etiqueta('d', 'Destino: ' + D.etiqueta, D.ll).addTo(this.capaExtra);
+    pts.push(O.ll, D.ll);
+    return pts;
   }
-  vistaGrafo(){
-    const m=this.m;this.modoG=true;$('btnG').textContent='Volver al mapa';
-    [this.capaParadas,this.capaRuta,this.capaLineas].forEach(l=>this.map.removeLayer(l));this.extra.forEach(x=>this.map.removeLayer(x));
-    this.map.getPane('tilePane').style.display='none';$('map').style.background='#f4f6f9';
-    this.capaGrafo.clearLayers();const pts=[];
-    this.ultimo.res.legs.forEach(l=>{
-      const c=l.cands[l.sel],col=m.empresas[m.rutas[c.ri].ei].c;
-      L.polyline(c.nodos.map(i=>m.nodos[i].ll),{color:col,weight:6}).addTo(this.capaGrafo);
-      c.nodos.forEach(i=>{L.circleMarker(m.nodos[i].ll,{radius:9,color:col,weight:4,fillColor:'#fff',fillOpacity:1}).addTo(this.capaGrafo)
-        .bindTooltip(m.nodos[i].n,{permanent:true,direction:'top',offset:[0,-8]});pts.push(m.nodos[i].ll);});
+  renderPanel() {
+    const r = this.res, m = this.m;
+    const directo = r.modo === 'directo', n = r.tramos[0].cands.length;
+    $('resTitulo').textContent = directo ? `${n} ${n === 1 ? 'Ruta Directa Disponible' : 'Rutas Directas Disponibles'}` : `Sin ruta directa · ${r.tramos.length - 1} transbordo${r.tramos.length > 2 ? 's' : ''}`;
+    $('resSub').textContent = `${r.origen.etiqueta} → ${r.destino.etiqueta}`;
+    $('resInfo').innerHTML = directo
+      ? '📍 ' + (n > 1 ? `${n} opciones en carretera. Toque para elegir su buseta:` : 'Una sola buseta lo lleva:')
+      : '📍 Ninguna buseta va directo. Combine estas:';
+    let h = '', asig = false;
+    r.tramos.forEach((t, ti) => {
+      if (!directo) h += `<div class="tramo-tit">Tramo ${ti + 1}: ${esc(m.nodos[t.desde].n)} → ${esc(m.nodos[t.hasta].n)}</div>`;
+      t.cands.forEach((c, j) => {
+        const ru = m.rutas[c.ri], em = m.empresas[ru.ei], sel = j === t.sel; if (ru.asig) asig = true;
+        const min = Math.round(c.km / VEL * 60);
+        const vias = ru.vias.length ? `<div class="c-vias"><b>Carreteras y vías:</b> ${esc(ru.vias.slice(0, 4).join(' · '))}${ru.vias.length > 4 ? '…' : ''}</div>` : '';
+        const camina = (c.caminaO > 30 || c.caminaD > 30) ? `<div class="c-camina">${ICON.camina} ${c.caminaO > 30 ? 'Camine ≈ ' + fmtM(c.caminaO) + ' hasta la parada. ' : ''}${c.caminaD > 30 ? 'Al bajar, ≈ ' + fmtM(c.caminaD) + ' a pie.' : ''}</div>` : '';
+        h += `<div class="cand${sel ? ' sel' : ''}" data-t="${ti}" data-c="${j}" style="--col:${em.c}">
+          <div class="c-top"><span class="c-dot"></span><b class="c-emp">${esc(em.n)}</b><span class="c-cod">${esc(ru.cod)}${ru.asig ? '*' : ''}</span>${j === 0 && t.cands.length > 1 ? '<span class="c-tag">Más rápida</span>' : ''}<span class="c-min">${ICON.reloj} ≈ ${min} min</span></div>
+          <div class="c-nom">${esc(ru.nom)}</div>
+          <div class="c-met"><span>${ICON.regla} ${c.km.toFixed(1)} km</span><i>•</i><span>${ICON.gente} ${c.nodos.length} paradas</span><i>•</i><span>${VEL} km/h</span></div>
+          <div class="c-sube">Sube en <b>${esc(m.nodos[c.nodos[0]].n)}</b> · baja en <b>${esc(m.nodos[c.nodos[c.nodos.length - 1]].n)}</b></div>
+          ${camina}${vias}
+          <div class="c-pie">${ICON.mano} ${sel && t.cands.length > 1 ? 'Opción elegida · toque otra para cambiar' : (t.cands.length > 1 ? 'Toca para elegir esta opción' : 'Ruta única en este tramo')}<span class="c-chev">›</span></div></div>`;
+      });
     });
-    this.capaGrafo.addTo(this.map);this.map.fitBounds(L.latLngBounds(pts),{padding:[100,100]});
+    $('resLista').innerHTML = h;
+    // nota inferior: tiempo total y aclaraciones
+    let km = 0, completo = true;
+    r.tramos.forEach(t => { const c = t.sel >= 0 ? t.cands[t.sel] : null; if (c) km += c.km; else completo = false; });
+    let nota = completo ? `<b>Tiempo total aproximado: ≈ ${Math.round(km / VEL * 60)} min</b> (${km.toFixed(1)} km). ` : 'Elija una buseta en cada tramo para ver el tiempo total. ';
+    nota += `Tiempos aproximados, calculados a ${VEL} km/h, sin contar esperas ni transbordos.`;
+    if (asig) nota += ' * Código asignado por el equipo (no oficial).';
+    $('resNota').innerHTML = nota;
+    $('resultado').classList.remove('oculto');
+    this.renderCerca();
   }
-  vistaMapa(){
-    this.modoG=false;$('btnG').textContent='Grafo';
-    this.map.getPane('tilePane').style.display='';$('map').style.background='#dfe5ea';
-    this.map.removeLayer(this.capaGrafo);
-    [this.capaParadas,this.capaLineas,this.capaRuta].forEach(l=>l.addTo(this.map));this.extra.forEach(x=>x.addTo(this.map));
-    if(this.ultimo)this.map.fitBounds(this.ultimo.bounds,{padding:[90,90]});
+  elegir(ti, j) {
+    const t = this.res.tramos[ti]; if (t.cands.length === 1) return;
+    t.sel = t.sel === j ? -1 : j;
+    this.dibujar(); this.renderPanel();
   }
+
+  // ------------------------------------------------------------------ ubicación en tiempo real
+  dibujarUsuario(pos) {
+    this.capaUser.clearLayers();
+    L.circle([pos.lat, pos.lng], { radius: pos.precision, color: '#2563ff', weight: 1, fillColor: '#2563ff', fillOpacity: .12 }).addTo(this.capaUser);
+    L.marker([pos.lat, pos.lng], { zIndexOffset: 1000, icon: L.divIcon({ className: '', html: '<div class="yo"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) })
+      .addTo(this.capaUser).bindTooltip('Usted está aquí');
+  }
+  /** "Cerca de usted": por qué lado pasa cada buseta y hacia dónde avanza, según donde esté ahora. */
+  renderCerca() {
+    this.capaCerca.clearLayers();
+    const box = $('resCerca'), r = this.res, pos = this.m.miPos;
+    if (!r || !pos) { box.classList.add('oculto'); return; }
+    const t0 = r.tramos[0], cands = t0.cands;
+    const prox = this.m.proximidad(cands, [pos.lat, pos.lng]).filter(p => p.pt);
+    if (!prox.length) { box.classList.add('oculto'); return; }
+    const dest = esc(r.tramos[0].cands.length ? this.m.nodos[t0.hasta].n : r.destino.etiqueta);
+    let h = '<div class="cerca-t">📍 Cerca de usted ahora <small>(se actualiza mientras se mueve)</small></div>';
+    prox.slice(0, 5).forEach((p, k) => {
+      const c = cands[p.j], ru = this.m.rutas[c.ri], em = this.m.empresas[ru.ei], mt = p.pt.metros;
+      const donde = mt <= 60
+        ? `<b>Usted está sobre la ruta.</b> Espere aquí la buseta: en este punto avanza hacia el <b>${p.pt.sentido}</b>.`
+        : `Pasa a <b>${fmtM(mt)}</b> al <b>${p.pt.lado}</b> de usted. Allí las busetas hacia ${dest} avanzan hacia el <b>${p.pt.sentido}</b>.`;
+      h += `<div class="cerca-i" style="--col:${em.c}"><b>${esc(ru.cod)}</b> · ${esc(em.n)}<br>${donde}${p.paradaCerca ? `<br><span class="nota">Parada de esta ruta más cercana: ${esc(p.paradaCerca.nombre)} (≈ ${fmtM(p.paradaCerca.metros)}).</span>` : ''}</div>`;
+      if (k < 4 && mt > 25) {
+        L.polyline([[pos.lat, pos.lng], [p.pt.lat, p.pt.lng]], { color: em.c, weight: 3, dashArray: '3 6' }).addTo(this.capaCerca);
+        L.marker([p.pt.lat, p.pt.lng], { interactive: false, icon: L.divIcon({ className: '', html: `<div class="cp" style="background:${em.c}">${esc(ru.cod)}</div>`, iconSize: [0, 0] }) }).addTo(this.capaCerca);
+      }
+    });
+    box.innerHTML = h; box.classList.remove('oculto');
+  }
+  hintUbicacion(info) {
+    const h = $('hintUbic');
+    if (!info) { h.classList.add('oculto'); return; }
+    h.innerHTML = `📍 Parada más cercana a usted: <b>${esc(info.nombre)}</b> (≈ ${fmtM(info.metros)}) <button id="usarMiUbic">Usar mi ubicación como origen</button>`;
+    h.classList.remove('oculto');
+  }
+
+  // ------------------------------------------------------------------ líneas por empresa
+  pintarEmpresas() {
+    const m = this.m;
+    $('empTabs').innerHTML = m.empresas.map((e, i) => `<button class="tab${i === this.empActiva ? ' act' : ''}" data-e="${i}"><i style="background:${e.c}"></i>${esc(e.n.replace(/\s+(S\.A\.|Ltda\.)$/, ''))} <small>(${m.rutasDe(i).length})</small></button>`).join('');
+    const e = m.empresas[this.empActiva], lista = m.rutasDe(this.empActiva);
+    let h = `<div class="emp-card"><i style="background:${e.c}"></i><div><b>${esc(e.n)}</b><span>${lista.length} rutas registradas en el área metropolitana</span></div></div>`;
+    lista.forEach(ri => {
+      const ru = m.rutas[ri]; let km = null;
+      if (m.KM) { km = 0; for (let k = 0; k < ru.p.length - 1; k++) km += m.KM[ru.p[k]][ru.p[k + 1]]; }
+      const vias = ru.vias.length ? `<div class="r-vias"><b>Vías:</b> ${esc(ru.vias.slice(0, 5).join(' · '))}${ru.vias.length > 5 ? '…' : ''}</div>` : '';
+      h += `<div class="rcard"><div class="r-top"><span class="r-cod">${esc(ru.cod)}${ru.asig ? '*' : ''}</span><div class="r-nom">${esc(ru.nom)}</div></div>
+        <div class="r-met"><span>${ICON.reloj} ${km == null ? '—' : '≈ ' + Math.round(km / VEL * 60) + ' min'}</span><i>•</i><span>${ICON.regla} ${km == null ? '—' : km.toFixed(1) + ' km'}</span><i>•</i><span>${VEL} km/h</span><i>•</i><span>${ICON.gente} ${ru.p.length} paradas</span></div>
+        ${vias}
+        <div class="r-act"><button class="r-ver" data-ver="${ri}">${ICON.ruta} ${this.empRutas.has(ri) ? 'Ocultar recorrido' : 'Ver recorrido en carretera'}</button><button class="r-usar" data-usar="${ri}">Usar ruta</button></div></div>`;
+    });
+    $('empLista').innerHTML = h;
+  }
+  dibujarRecorrido(ri, geo) {
+    const ru = this.m.rutas[ri], em = this.m.empresas[ru.ei], g = L.layerGroup();
+    L.polyline(geo, { color: '#fff', weight: 11, opacity: .95 }).addTo(g);
+    L.polyline(geo, { color: em.c, weight: 6, dashArray: '12 9' }).addTo(g).bindTooltip(`${esc(em.n)} · ${esc(ru.cod)}<br>${esc(ru.nom)}`, { sticky: true });
+    g.addTo(this.capaEmp); this.empRutas.set(ri, g);
+    this.map.fitBounds(L.latLngBounds(geo), { padding: [80, 80] });
+  }
+  quitarRecorrido(ri) { const g = this.empRutas.get(ri); if (g) { this.capaEmp.removeLayer(g); this.empRutas.delete(ri); } }
+  ocultarTrazado() { this.capaEmp.clearLayers(); this.empRutas.clear(); }
 }
 
 /* =====================================================================
-   CONTROLADOR  (eventos de pantalla ↔ modelo ↔ vista)
+   CONTROLADOR
    ===================================================================== */
-class Controlador{
-  constructor(m,v){
-    this.m=m;this.v=v;
-    v.pintarParadas((i,ll)=>m.moverNodo(i,ll));
-    m.addEventListener('verificando',e=>{v.actualizarNodo(e.detail.i);v.estado(`Verificando ubicaciones con OpenStreetMap… ${e.detail.hechos}/${e.detail.total}`,true);});
-    m.addEventListener('verificado',()=>{
-      const n=m.nodos.filter(x=>x.ver==='aprox').length;
-      v.estado(n?`Listo. ${n} parada(s) en gris no se encontraron en OpenStreetMap: arrástrelas con “Ajustar paradas”.`:'Ubicaciones verificadas con OpenStreetMap ✔',true);
-    });
-    m.addEventListener('progreso',e=>v.estado(e.detail.txt,true));
-    m.addEventListener('nodoMovido',e=>{v.actualizarNodo(e.detail.i);m.rutas.forEach((r,ri)=>{if(r.p.includes(e.detail.i))v.quitarRuta(ri);});});
+class Controlador {
+  constructor(m, v) {
+    this.m = m; this.v = v; this.ultimaBusqueda = null; this.watch = null; this.ultCercana = 0; this.buscando = false;
+    v.cb.mover = (i, ll) => m.moverNodo(i, ll);
+    v.cb.elegir = (ti, j) => v.elegir(ti, j);
+    v.pintarParadas(); v.pintarEmpresas();
 
-    $('sim').onclick=()=>this.buscar();
-    $('btnG').onclick=()=>{if(!v.ultimo)return;v.modoG?v.vistaMapa():v.vistaGrafo();};
-    $('btnL').onclick=()=>{const p=$('lineas');p.style.display=p.style.display==='block'?'none':'block';};
-    $('ajus').onchange=e=>v.permitirArrastre(e.target.checked);
-    $('copiar').onclick=function(){
-      const t=m.nodos.map(n=>[n.id,n.n,n.ll[0].toFixed(4),n.ll[1].toFixed(4),n.al.join(";")].join("|")).join("\n");
-      (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{this.textContent='¡Copiado!';setTimeout(()=>this.textContent='Copiar coordenadas corregidas',1500);})
-        .catch(()=>prompt('Copie este texto y péguelo en NODOS_TXT:',t));
+    m.addEventListener('verificando', () => v.estado('Verificando ubicaciones con OpenStreetMap…', true));
+    m.addEventListener('verificado', e => {
+      v.actualizarParadas();
+      const { ok, total } = e.detail;
+      v.estado(ok < total ? `Ubicaciones verificadas: ${ok} de ${total}. Las paradas grises no se encontraron en OpenStreetMap: toque una y corríjala.` : 'Ubicaciones verificadas con OpenStreetMap ✔', true);
+      setTimeout(() => { if (!this.buscando) v.estado(''); }, 9000);
+    });
+    m.addEventListener('listo', () => { v.pintarEmpresas(); });
+    m.addEventListener('progreso', e => v.estado(e.detail.txt, true));
+    m.addEventListener('nodoMovido', e => { v.actualizarParadas(); v.estado('Parada corregida y guardada ✔', true); setTimeout(() => v.estado(''), 3000); });
+
+    // formulario
+    $('btnBuscar').onclick = () => this.buscar(false);
+    $('btnLimpiar').onclick = () => { v.salirGrafo(); $('origen').value = ''; $('destino').value = ''; v.limpiar(); v.hintUbicacion(null); v.estado(''); this.refrescarHint(); };
+    $('btnSwap').onclick = () => { const o = $('origen').value; $('origen').value = $('destino').value; $('destino').value = o; };
+    document.querySelectorAll('[data-limpia]').forEach(b => b.onclick = () => { $(b.dataset.limpia).value = ''; $(b.dataset.limpia).focus(); });
+    ['origen', 'destino'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') this.buscar(false); }));
+    const FREC = [['Univ. Simón Bolívar', 'Universidad Simón Bolívar'], ['Los Patios (Centro)', 'Los Patios'], ['El Zulia', 'El Zulia'], ['Tierra Linda (Los Patios)', 'Tierra Linda (Los Patios)'], ['Parque Santander (Centro)', 'Centro (Parque Santander)']];
+    $('frecuentes').innerHTML = FREC.map(([t, val]) => `<button class="fr" data-v="${esc(val)}">${esc(t)}</button>`).join('');
+    $('frecuentes').onclick = e => { const b = e.target.closest('.fr'); if (!b) return; const o = $('origen'), d = $('destino'); (o.value.trim() ? (d.value.trim() ? o : d) : o).value = b.dataset.v; };
+    $('chkAjustar').onchange = e => v.permitirArrastre(e.target.checked);
+    $('btnCapas').onclick = () => v.cambiarBase();
+
+    // resultado
+    $('resCerrar').onclick = () => { v.salirGrafo(); $('resultado').classList.add('oculto'); };
+    $('btnGrafo').onclick = () => v.modoGrafo ? v.salirGrafo() : v.verGrafo();
+    $('chkTodas').onchange = e => { v.verTodas = e.target.checked; if (v.res) v.dibujar(); };
+    $('resLista').onclick = e => { const c = e.target.closest('.cand'); if (c) v.elegir(+c.dataset.t, +c.dataset.c); };
+
+    // empresas
+    $('btnEmpresas').onclick = () => { $('empresas').classList.remove('oculto'); $('panel').classList.add('oculto'); v.pintarEmpresas(); };
+    $('empCerrar').onclick = () => { $('empresas').classList.add('oculto'); $('panel').classList.remove('oculto'); };
+    $('empTabs').onclick = e => { const b = e.target.closest('.tab'); if (b) { v.empActiva = +b.dataset.e; v.pintarEmpresas(); } };
+    $('empLista').onclick = e => {
+      const ver = e.target.closest('[data-ver]'), usar = e.target.closest('[data-usar]');
+      if (ver) this.verRecorrido(+ver.dataset.ver);
+      if (usar) this.usarRuta(+usar.dataset.usar);
     };
-    $('lineas').onchange=e=>{if(e.target.dataset.e!==undefined)this.alternarEmpresa(+e.target.dataset.e,e.target.checked);};
-    $('lineas').onclick=e=>{
-      if(e.target.dataset.ocultar)v.ocultarTodas();
-      else if(e.target.dataset.r!==undefined)this.alternarRuta(+e.target.dataset.r);
-    };
-    $('card').onclick=e=>{const el=e.target.closest('.cand');if(el)this.elegir(+el.dataset.leg,+el.dataset.c);};
+    $('empOcultar').onclick = () => { v.ocultarTrazado(); v.pintarEmpresas(); };
+
+    // ubicación
+    $('btnUbic').onclick = () => this.pedirUbicacion(true);
+    $('btnSimularUbic').onclick = () => this.simularUbicacion();
+    $('hintUbic').onclick = e => { if (e.target.id === 'usarMiUbic') { $('origen').value = 'Mi ubicación'; } };
+    $('ubPermitir').onclick = () => { localStorage.setItem('evatre:ubic', 'si'); $('modalUbic').classList.add('oculto'); this.iniciarUbicacion(); };
+    $('ubCancelar').onclick = () => { localStorage.setItem('evatre:ubic', 'no'); $('modalUbic').classList.add('oculto'); v.estado(''); };
+    const dec = localStorage.getItem('evatre:ubic');
+    if (dec === 'si') this.iniciarUbicacion(); else if (dec !== 'no') setTimeout(() => $('modalUbic').classList.remove('oculto'), 700);
+
+    window.corregirParada = i => this.corregirParada(i);
   }
-  async buscar(){
-    const v=this.v,btn=$('sim');btn.disabled=true;btn.textContent='Calculando...';
-    v.limpiarResultado();
-    try{const res=await this.m.buscar($('o').value,$('d').value);v.estado('');v.mostrarResultado(res);}
-    catch(e){v.estado(e.message);}
-    btn.disabled=false;btn.textContent='Buscar ruta';
+
+  async buscar(auto) {
+    const v = this.v, btn = $('btnBuscar');
+    const o = $('origen').value.trim(), d = $('destino').value.trim();
+    if (!o || !d) { v.estado('Escriba el origen y el destino.'); return; }
+    if (this.buscando) return;
+    this.buscando = true;
+    if (!auto) { v.limpiar(); btn.disabled = true; btn.querySelector('span').textContent = 'Buscando…'; v.estado('Preparando la red de transporte…', true); }
+    try {
+      const res = await this.m.buscar(o, d);
+      v.estado(''); v.mostrar(res, auto);
+      this.ultimaBusqueda = { t: Date.now(), pos: this.m.miPos ? { ...this.m.miPos } : null };
+    } catch (e) { if (!auto) v.estado(e.message); }
+    this.buscando = false;
+    if (!auto) { btn.disabled = false; btn.querySelector('span').textContent = 'Buscar Ruta Directa'; }
   }
-  async elegir(i,j){
-    const res=this.v.ultimo&&this.v.ultimo.res;if(!res)return;
-    const l=res.legs[i];if(l.sel===j)return;
-    this.v.estado('Ajustando a la carretera…',true);
-    const geo=await this.m.servicio.ruta(l.cands[j].nodos.map(x=>this.m.nodos[x].ll));
-    this.v.estado(geo?'':'No se pudo ajustar este recorrido a la carretera.');
-    if(!geo)return;
-    l.sel=j;l.geo=geo;this.v.dibujarTramo(i,l);this.v.pintarCard(res);
+
+  // ------------------------------------------------------------------ líneas por empresa
+  async verRecorrido(ri) {
+    const v = this.v;
+    if (v.empRutas.has(ri)) { v.quitarRecorrido(ri); v.pintarEmpresas(); return; }
+    v.estado('Ajustando el recorrido a la carretera…', true);
+    await this.m.listo;
+    const geo = await this.m.geometriaRuta(ri);
+    v.estado(geo ? '' : 'No se pudo ajustar este recorrido a la carretera; intente de nuevo.');
+    if (geo) { v.dibujarRecorrido(ri, geo); v.pintarEmpresas(); }
   }
-  async alternarEmpresa(ei,on){
-    const lista=this.m.rutasDe(ei);
-    if(!on){lista.forEach(ri=>this.v.quitarRuta(ri));this.v.estado('');return;}
-    await this.m.listo;let fallos=0;
-    for(let k=0;k<lista.length;k++){
-      if(!$('lineas').querySelector(`input[data-e="${ei}"]`).checked)return;
-      this.v.estado(`Ajustando ${this.m.empresas[ei].n} a la carretera (${k+1}/${lista.length})…`,true);
-      const geo=await this.m.geometriaRuta(lista[k]);
-      if(geo)this.v.dibujarRuta(lista[k],geo,false);else fallos++;
-      await dormir(120);
+  usarRuta(ri) {
+    const ru = this.m.rutas[ri], a = ru.p[0], b = ru.p[ru.p.length - 1];
+    $('origen').value = this.m.nodos[a].n; $('destino').value = this.m.nodos[b].n;
+    $('empresas').classList.add('oculto'); $('panel').classList.remove('oculto');
+    this.buscar(false);
+  }
+
+  // ------------------------------------------------------------------ corrección de paradas con Google Maps
+  corregirParada(i) {
+    const nd = this.m.nodos[i];
+    const txt = prompt(`Coordenadas de «${nd.n}».\nEn Google Maps: clic derecho sobre el punto exacto y clic en los números (se copian). Péguelos aquí:`, `${nd.ll[0].toFixed(5)}, ${nd.ll[1].toFixed(5)}`);
+    if (!txt) return;
+    const m = txt.match(/(-?\d+\.\d+)[\s,;]+(-?\d+\.\d+)/);
+    if (!m) { this.v.estado('No entendí las coordenadas. Ejemplo: 7.81611, -72.51386'); return; }
+    const lat = +m[1], lng = +m[2];
+    if (lat < 7.5 || lat > 8.3 || lng < -72.9 || lng > -72.1) { this.v.estado('Esas coordenadas están fuera del área de Cúcuta.'); return; }
+    this.m.moverNodo(i, [lat, lng]); this.v.map.closePopup();
+  }
+
+  // ------------------------------------------------------------------ ubicación en tiempo real
+  pedirUbicacion(usarComoOrigen) {
+    if (this.m.miPos) { if (usarComoOrigen) $('origen').value = 'Mi ubicación'; this.v.map.flyTo([this.m.miPos.lat, this.m.miPos.lng], 15); return; }
+    const dec = localStorage.getItem('evatre:ubic');
+    if (dec === 'si') { this.iniciarUbicacion(); this.v.estado('Buscando su ubicación…', true); }
+    else $('modalUbic').classList.remove('oculto');
+  }
+  simularUbicacion() {
+    // Punto de demostración céntrico en Cúcuta; no requiere GPS ni permiso del navegador.
+    if (this.watch != null && 'geolocation' in navigator) {
+      navigator.geolocation.clearWatch(this.watch); this.watch = null;
     }
-    this.v.estado(fallos?`${fallos} ruta(s) no se pudieron ajustar a la carretera; vuelva a marcar la empresa.`:'');
+    const pos = { lat: 7.8939, lng: -72.5078, precision: 35, simulada: true };
+    this.m.miPos = pos;
+    this.v.dibujarUsuario(pos);
+    this.v.map.flyTo([pos.lat, pos.lng], 15);
+    $('origen').value = 'Mi ubicación';
+    this.refrescarHint();
+    this.v.renderCerca();
+    this.v.estado('Ubicación simulada en el Parque Santander, Cúcuta.', true);
   }
-  async alternarRuta(ri){
-    if(this.v.dibujadas.has(ri)){this.v.quitarRuta(ri);return;}
-    await this.m.listo;this.v.estado('Ajustando la ruta a la carretera…',true);
-    const geo=await this.m.geometriaRuta(ri);
-    this.v.estado(geo?'':'No se pudo ajustar esta ruta a la carretera; intente de nuevo.');
-    if(geo)this.v.dibujarRuta(ri,geo,true);
+  iniciarUbicacion() {
+    if (!('geolocation' in navigator)) { this.v.estado('Este navegador no permite obtener la ubicación.'); return; }
+    if (this.watch != null) return;
+    this.v.estado('Buscando su ubicación…', true);
+    this.watch = navigator.geolocation.watchPosition(p => this.alPosicion(p), e => this.errorUbicacion(e), { enableHighAccuracy: true, maximumAge: 5000, timeout: 25000 });
+  }
+  errorUbicacion(e) {
+    if (e.code === 1) { localStorage.setItem('evatre:ubic', 'no'); navigator.geolocation.clearWatch(this.watch); this.watch = null; this.v.estado('Permiso de ubicación denegado. Puede activarlo en el candado de la barra de direcciones.'); }
+    else this.v.estado('No se pudo obtener su ubicación todavía (' + (e.message || 'sin señal') + '). Si abrió el archivo directamente, ábralo desde NetBeans (http://localhost).');
+  }
+  alPosicion(p) {
+    const pos = { lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy };
+    const primera = !this.m.miPos;
+    this.m.miPos = pos; this.v.dibujarUsuario(pos);
+    if (primera) {
+      this.v.estado('');
+      const dentro = pos.lat > 7.70 && pos.lat < 8.05 && pos.lng > -72.75 && pos.lng < -72.30;
+      if (dentro) this.v.map.flyTo([pos.lat, pos.lng], 15); else this.v.estado('Su ubicación está fuera del área de Cúcuta; se muestra igualmente.');
+    }
+    this.refrescarHint();
+    this.v.renderCerca();                         // lado y sentido de cada buseta respecto a usted
+    // si el origen es "Mi ubicación", se vuelve a buscar cuando usted se desplaza
+    const orig = $('origen').value.trim().toLowerCase();
+    if (this.v.res && (orig === 'mi ubicación' || orig === 'mi ubicacion') && this.ultimaBusqueda && this.ultimaBusqueda.pos) {
+      const mov = hav([pos.lat, pos.lng], [this.ultimaBusqueda.pos.lat, this.ultimaBusqueda.pos.lng]) * 1000;
+      if (mov > 150 && Date.now() - this.ultimaBusqueda.t > 20000) this.buscar(true);
+    }
+  }
+  refrescarHint() {
+    if (!this.m.miPos) { this.v.hintUbicacion(null); return; }
+    const c = this.m.masCercana([this.m.miPos.lat, this.m.miPos.lng]);
+    this.v.hintUbicacion(c ? { nombre: this.m.nodos[c.i].n, metros: c.metros } : null);
   }
 }
 
-/* ================= Arranque ================= */
-const modelo=new Modelo(), vista=new Vista(modelo);
-new Controlador(modelo,vista);
+/* ---------- Arranque ---------- */
+const modelo = new Modelo();
+const vista = new Vista(modelo);
+new Controlador(modelo, vista);

@@ -1,0 +1,18 @@
+EVATRE - Busetas de Cúcuta, Los Patios y El Zulia
+==================================================
+Cómo usarlo en NetBeans:
+  1. Reemplace los archivos de su proyecto APLICACION por estos (o abra esta carpeta como proyecto HTML5).
+  2. Ejecute indexx.html desde NetBeans (se abre en http://localhost:8383/...). Necesita internet.
+     La ubicación en tiempo real solo funciona desde http://localhost (no abriendo el archivo directamente).
+
+Archivos:
+  indexx.html  Pantalla (vista)
+  styles.css   Estilos
+  datos.js     Paradas, empresas y rutas: AQUÍ se corrigen coordenadas y se agregan rutas
+  modelo.js    Grafo, matriz de adyacencia, Dijkstra, búsqueda de rutas directas (modelo)
+  app.js       Interfaz y controlador (mapa, resultado, ubicación en tiempo real)
+
+Notas:
+  * Un código con * (ej. TS-3*) lo asignó el equipo; no es oficial.
+  * Tiempo aproximado = km / 20 km/h (constante VEL en modelo.js).
+  * Si una parada está mal ubicada: toque la parada en el mapa > "Corregir con coordenadas de Google Maps".
